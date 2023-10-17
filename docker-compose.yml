@@ -1,0 +1,44 @@
+version: "3.3"
+
+services:
+  mariadb:
+    image: mariadb:latest
+    command: --innodb_fast_shutdown=0
+    container_name: mariadb
+    restart: on-failure
+    volumes:
+      - /data-crypt/mariadb/data:/var/lib/mysql
+      - /data-crypt/mariadb/backup:/var/lib/backup
+    environment:
+      - MYSQL_ROOT_PASSWORD='XXX'
+      - MARIADB_AUTO_UPGRADE=1
+    networks:
+      - network
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    restart: on-failure
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tristanhoffmann-phpmyadmin.rule=Host(`phpmyadmin.tristanhoffmann.de`)"
+      - "traefik.http.routers.tristanhoffmann-phpmyadmin.entrypoints=https"
+      - "traefik.http.routers.tristanhoffmann-phpmyadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tristanhoffmann-phpmyadmin.middlewares=secure-header@file"
+      - "traefik.http.routers.phpmyadmin-local.rule=Host(`debian`) && PathPrefix(`/phpmyadmin`)"
+      - "traefik.http.routers.phpmyadmin-local.entrypoints=https"
+      - "traefik.http.routers.phpmyadmin-local.tls=true"
+      - "traefik.http.routers.phpmyadmin-local.middlewares=phpmyadmin-strip"
+      - "traefik.http.middlewares.phpmyadmin-strip.stripprefix.prefixes=/phpmyadmin"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+    networks: 
+      - network
+      - traefik_network
+    environment:
+      - PMA_ABSOLUTE_URI=https://phpmyadmin.tristanhoffmann.de/
+      - PMA_HOST=mariadb
+      - UPLOAD_LIMIT=300M
+
+networks:
+  network:
+  traefik_network:
+    external: true
